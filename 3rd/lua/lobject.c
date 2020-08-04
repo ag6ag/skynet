@@ -1,5 +1,5 @@
 /*
-** $Id: lobject.c,v 2.110 2016/05/02 14:00:32 roberto Exp $
+** $Id: lobject.c,v 2.113.1.1 2017/04/19 17:29:57 roberto Exp $
 ** Some generic functions over Lua objects
 ** See Copyright Notice in lua.h
 */
@@ -280,7 +280,7 @@ static const char *l_str2d (const char *s, lua_Number *result) {
   endptr = l_str2dloc(s, result, mode);  /* try to convert */
   if (endptr == NULL) {  /* failed? may be a different locale */
     char buff[L_MAXLENNUM + 1];
-    char *pdot = strchr(s, '.');
+    const char *pdot = strchr(s, '.');
     if (strlen(s) > L_MAXLENNUM || pdot == NULL)
       return NULL;  /* string too long or no dot; fail */
     strcpy(buff, s);  /* copy string to buffer */
@@ -292,6 +292,9 @@ static const char *l_str2d (const char *s, lua_Number *result) {
   return endptr;
 }
 
+
+#define MAXBY10		cast(lua_Unsigned, LUA_MAXINTEGER / 10)
+#define MAXLASTD	cast_int(LUA_MAXINTEGER % 10)
 
 static const char *l_str2int (const char *s, lua_Integer *result) {
   lua_Unsigned a = 0;
@@ -309,7 +312,10 @@ static const char *l_str2int (const char *s, lua_Integer *result) {
   }
   else {  /* decimal */
     for (; lisdigit(cast_uchar(*s)); s++) {
-      a = a * 10 + *s - '0';
+      int d = *s - '0';
+      if (a >= MAXBY10 && (a > MAXBY10 || d > MAXLASTD + neg))  /* overflow? */
+        return NULL;  /* do not accept it (as integer) */
+      a = a * 10 + d;
       empty = 0;
     }
   }
@@ -388,7 +394,7 @@ static void pushstr (lua_State *L, const char *str, size_t l) {
 
 
 /*
-** this function handles only '%d', '%c', '%f', '%p', and '%s' 
+** this function handles only '%d', '%c', '%f', '%p', and '%s'
    conventional formats, plus Lua-specific '%I' and '%U'
 */
 const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
@@ -429,7 +435,8 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
       }
       case 'p': {  /* a pointer */
         char buff[4*sizeof(void *) + 8]; /* should be enough space for a '%p' */
-        int l = l_sprintf(buff, sizeof(buff), "%p", va_arg(argp, void *));
+        void *p = va_arg(argp, void *);
+        int l = lua_pointer2str(buff, sizeof(buff), p);
         pushstr(L, buff, l);
         break;
       }

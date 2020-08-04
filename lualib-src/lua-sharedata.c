@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <stdint.h>
@@ -251,6 +253,7 @@ fillcolliding(lua_State *L, struct context *ctx) {
 				for (i=emptyslot;i<sizehash;i++) {
 					if (tbl->hash[i].valuetype == VALUETYPE_NIL) {
 						n = &tbl->hash[i];
+						emptyslot = i + 1;
 						break;
 					}
 				}
@@ -762,8 +765,8 @@ lupdate(lua_State *L) {
 	return 0;
 }
 
-int
-luaopen_sharedata_core(lua_State *L) {
+LUAMOD_API int
+luaopen_skynet_sharedata_core(lua_State *L) {
 	luaL_Reg l[] = {
 		// used by host
 		{ "new", lnewconf },
